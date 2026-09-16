@@ -1,0 +1,9 @@
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors><certificates src="system" /></trust-anchors>
+    </base-config>
+    <!-- 原代理明确要求酷我音频使用 HTTP；例外只覆盖该音源。 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">kuwo.cn</domain>
+    </domain-config>
+</network-security-config>

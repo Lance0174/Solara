@@ -1,0 +1,10 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+*.jks
+*.keystore
+
+# 上游 data/ 用于忽略服务器数据，Android 的数据层源码必须保留。
+!app/src/main/java/io/github/akudamatata/solara/data/
+!app/src/main/java/io/github/akudamatata/solara/data/**
