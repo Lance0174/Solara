@@ -3,6 +3,7 @@ package io.github.akudamatata.solara
 import android.app.Application
 import android.content.ComponentName
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
@@ -143,6 +144,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadLyrics(song: Song? = playback.value.song) {
         if (song == null) return
+        // 本地音频没有在线歌词，直接显示空状态。
+        if (song.localUri.isNotBlank()) { mutableLyrics.value = LyricsState(); return }
         lyricJob?.cancel()
         lyricJob = viewModelScope.launch {
             mutableLyrics.value = LyricsState(busy = true)
@@ -442,6 +445,45 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             else -> addSongs(songs)
         }
         notice("已合并导入 ${songs.size} 首歌曲")
+    }
+
+    // 把手机里的本地音频文件加入本地歌单。source 固定为 local，重复选择同一文件自动去重。
+    fun importLocalAudio(uris: List<Uri>, playlistId: String?, onDone: () -> Unit = {}) = operation {
+        val songs = withContext(Dispatchers.IO) { uris.mapNotNull { readLocalAudio(it) } }
+        if (songs.isEmpty()) {
+            notice("没有可导入的本地音频文件")
+        } else {
+            when (playlistId) {
+                null -> createPlaylist("本地音乐", songs) {}
+                else -> addToPlaylist(playlistId, songs) {}
+            }
+            notice("已导入 ${songs.size} 首本地歌曲")
+            onDone()
+        }
+    }
+
+    private fun readLocalAudio(uri: Uri): Song? {
+        return try {
+            val resolver = app.contentResolver
+            var title = ""
+            var artist = ""
+            var album = ""
+            resolver.query(uri, arrayOf(
+                MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.ARTIST, MediaStore.Audio.Media.ALBUM), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    title = cursor.getString(1).orEmpty().ifBlank { cursor.getString(0).orEmpty().substringBeforeLast('.') }
+                    artist = cursor.getString(2).orEmpty()
+                    album = cursor.getString(3).orEmpty()
+                }
+            }
+            if (title.isBlank()) {
+                title = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.') ?: return null
+            }
+            Song.local(title, listOf(artist).filter { it.isNotBlank() }, album, uri.toString())
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun exportList(uri: Uri, favorites: Boolean, playlistId: String? = null) = operation {

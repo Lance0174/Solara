@@ -298,6 +298,10 @@ private fun LibraryScreen(
     var documentPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { it?.let { vm.importList(it, documentFavorites, documentPlaylistId) } }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { it?.let { vm.exportList(it, documentFavorites, documentPlaylistId) } }
+    // 多选本地音频文件导入歌单。
+    val localAudioImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) playlist?.let { vm.importLocalAudio(uris, it.id) }
+    }
     val songs = playlist?.songs ?: if (favorites) library.favorites else library.queue
     var query by rememberSaveable(section, playlistId) { mutableStateOf("") }
     val filteredSongs = remember(songs, query) { SongLists.search(songs, query) }
@@ -315,6 +319,7 @@ private fun LibraryScreen(
                 DropdownMenu(menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("导入歌单") }, onClick = { menu = false; documentFavorites = favorites; documentPlaylistId = playlist?.id; importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) })
                     if (playlist != null) DropdownMenuItem(text = { Text("导入网易云歌单") }, onClick = { menu = false; vm.clearPlaylistImport(); importingNetease = true })
+                    if (playlist != null) DropdownMenuItem(text = { Text("导入本地歌曲") }, onClick = { menu = false; localAudioImporter.launch(arrayOf("audio/*")) })
                     DropdownMenuItem(text = { Text("导出歌单") }, onClick = { menu = false; documentFavorites = favorites; documentPlaylistId = playlist?.id; exporter.launch("solara-${if (favorites) "favorites" else "playlist"}.json") }, enabled = songs.isNotEmpty())
                     DropdownMenuItem(text = { Text("保存到本地歌单") }, onClick = { menu = false; onAddToPlaylist(songs) }, enabled = songs.isNotEmpty())
                     if (favorites || playlist != null) DropdownMenuItem(text = { Text("全部加入播放列表") }, onClick = { menu = false; vm.addSongs(songs) }, enabled = songs.isNotEmpty())
@@ -361,7 +366,7 @@ private fun LibraryScreen(
                 }
             } else if (songs.isEmpty()) item {
                 if (playlist != null) {
-                    EmptyState(Icons.Rounded.LibraryMusic, "这份歌单还是空的", "在歌曲菜单选择“加入本地歌单”，也可从右上角导入已有歌单")
+                    EmptyState(Icons.Rounded.LibraryMusic, "这份歌单还是空的", "在歌曲菜单选择“加入本地歌单”，也可从右上角导入已有歌单或导入手机里的本地歌曲")
                     OutlinedButton(onClick = onSearch, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) { Text("去搜索歌曲") }
                 } else {
                     EmptyState(if (favorites) Icons.Rounded.FavoriteBorder else Icons.AutoMirrored.Rounded.QueueMusic,

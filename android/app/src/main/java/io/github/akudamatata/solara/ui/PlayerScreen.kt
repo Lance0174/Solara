@@ -60,7 +60,8 @@ fun SongArtwork(song: Song?, vm: MusicViewModel, modifier: Modifier = Modifier, 
     val settings by vm.settings.collectAsStateWithLifecycle()
     val url by produceState("", song?.key, resolvedUrl, settings.site, settings.api, resolve) {
         value = resolvedUrl.ifBlank { song?.picId?.takeIf { it.startsWith("https://") || it.startsWith("http://") }.orEmpty() }
-        if (value.isBlank() && song != null && resolve) {
+        // 本地音频没有封面且不需要向接口解析封面。
+        if (value.isBlank() && song != null && resolve && song.localUri.isBlank()) {
             try { value = withContext(Dispatchers.IO) { vm.app.api.cover(song) } }
             catch (error: CancellationException) { throw error }
             catch (_: Exception) { value = "" }
@@ -145,7 +146,7 @@ fun PlayerScreen(vm: MusicViewModel, onQueue: () -> Unit, onDownload: (Song) -> 
                             DropdownMenuItem(text = { Text("探索雷达") }, leadingIcon = { Icon(Icons.Rounded.Radar, null) },
                                 onClick = { menu = false; vm.radar() }, enabled = !busy && player.ready)
                             DropdownMenuItem(text = { Text("下载") }, leadingIcon = { Icon(Icons.Rounded.Download, null) },
-                                onClick = { menu = false; player.song?.let(onDownload) }, enabled = player.song != null)
+                                onClick = { menu = false; player.song?.let(onDownload) }, enabled = player.song != null && player.song!!.localUri.isBlank())
                         }
                     }
                 }

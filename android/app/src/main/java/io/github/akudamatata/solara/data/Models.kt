@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
 
-val SOURCES = linkedMapOf("netease" to "网易云音乐", "kuwo" to "酷我音乐", "joox" to "JOOX音乐", "bilibili" to "哔哩哔哩")
+val SOURCES = linkedMapOf("netease" to "网易云音乐", "kuwo" to "酷我音乐", "joox" to "JOOX音乐", "bilibili" to "哔哩哔哩", "local" to "本地音频")
 val QUALITIES = linkedMapOf("128" to "标准 · 128K", "192" to "高品 · 192K", "320" to "极高 · 320K", "999" to "无损 · FLAC")
 val GENRES = listOf("流行", "摇滚", "古典音乐", "民谣", "电子", "爵士", "说唱", "乡村", "蓝调", "R&B", "金属", "嘻哈", "轻音乐")
 const val DEFAULT_API = "https://music-api.gdstudio.xyz/api.php"
@@ -29,6 +29,13 @@ data class Song(
         .put("album", album).put("source", source).put("pic_id", picId)
         .put("lyric_id", lyricId).put("url_id", urlId).apply {
             if (includeLocal && localUri.isNotBlank()) put("local_uri", localUri)
+            // 便携导出不携带本机文件地址：source=local 的歌曲 id/歌词/url 字段都是本机 Uri，替换为不含路径的稳定占位。
+            if (!includeLocal && source == "local") {
+                val placeholder = "local-${(name.hashCode().toLong() and 0x7fffffff)}"
+                put("id", placeholder)
+                put("lyric_id", placeholder)
+                put("url_id", placeholder)
+            }
         }
 
     companion object {
@@ -46,9 +53,14 @@ data class Song(
                 album = json.optString("album", ""), source = source,
                 picId = json.optString("pic_id", ""), lyricId = json.optString("lyric_id", id),
                 urlId = json.optString("url_id", id),
-                localUri = if (allowLocal) json.optString("local_uri", "").takeIf { it.startsWith("content://media/") }.orEmpty() else "",
+                // 系统文件选择器可能返回 media 以外的 content:// 文件，均视为本机可播放的本地音频。
+                localUri = if (allowLocal) json.optString("local_uri", "").takeIf { it.startsWith("content://") }.orEmpty() else "",
             )
         }
+
+        // 本机音频文件的歌曲：source 固定为 local，id 使用稳定的 Uri 字符串。
+        fun local(name: String, artists: List<String> = emptyList(), album: String = "", uri: String): Song =
+            Song(id = uri, name = name, artists = artists, album = album, source = "local", localUri = uri)
     }
 }
 
