@@ -4,6 +4,8 @@
 local.properties
 *.jks
 *.keystore
+# 标准 Android 调试密钥：保证 release 签名与历史版本一致、可覆盖升级；非保密信息。
+!debug.keystore
 
 # 上游 data/ 用于忽略服务器数据，Android 的数据层源码必须保留。
 !app/src/main/java/io/github/akudamatata/solara/data/

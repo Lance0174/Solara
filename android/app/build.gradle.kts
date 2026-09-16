@@ -22,6 +22,22 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
     lint { abortOnError = true }
+    signingConfigs {
+        // Release 沿用 debug 签名，产物可直接安装并覆盖升级既有版本。
+        // 正式上架应用商店时请替换为独立签名密钥。
+        create("release") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
+    }
 }
 
 dependencies {

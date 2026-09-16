@@ -62,9 +62,17 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleRelease --no-daemon
 
+      - name: Rename release APK with project name and version
+        working-directory: android
+        run: |
+          VERSION=$(grep -oP "versionName\s*=\s*\"\K[^\"]+" app/build.gradle.kts)
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/Solara-${VERSION}.apk"
+          echo "artifact=Solara-${VERSION}.apk" >> "$GITHUB_ENV"
+
       - name: Upload release APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          files: android/dist/${{ env.artifact }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
