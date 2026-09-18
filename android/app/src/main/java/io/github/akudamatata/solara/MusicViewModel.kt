@@ -2,6 +2,7 @@ package io.github.akudamatata.solara
 
 import android.app.Application
 import android.content.ComponentName
+import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
@@ -448,14 +449,25 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // 把手机里的本地音频文件加入本地歌单。source 固定为 local，重复选择同一文件自动去重。
+    // 这里必须直接调用存储层：createPlaylist/addToPlaylist 自带 busy 守卫，本方法已在 operation 中，
+    // 再走它们会因“上一项操作仍在处理中”被直接拦截，导致导入静默失败。
     fun importLocalAudio(uris: List<Uri>, playlistId: String?, onDone: () -> Unit = {}) = operation {
+        // 文件选择器的一次性授权在进程重启后失效，持久化读取权限以便歌单里的本地歌曲之后仍可播放。
+        uris.forEach { uri ->
+            try { app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            catch (_: SecurityException) {}
+        }
         val songs = withContext(Dispatchers.IO) { uris.mapNotNull { readLocalAudio(it) } }
         if (songs.isEmpty()) {
             notice("没有可导入的本地音频文件")
         } else {
             when (playlistId) {
-                null -> createPlaylist("本地音乐", songs) {}
-                else -> addToPlaylist(playlistId, songs) {}
+                null -> {
+                    val existing = playlists.value.firstOrNull { it.name.equals("本地音乐", ignoreCase = true) }
+                    if (existing != null) app.store.updatePlaylist(existing.id) { it.add(songs) }
+                    else app.store.createPlaylist("本地音乐", songs)
+                }
+                else -> app.store.updatePlaylist(playlistId) { it.add(songs) }
             }
             notice("已导入 ${songs.size} 首本地歌曲")
             onDone()
@@ -468,13 +480,20 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             var title = ""
             var artist = ""
             var album = ""
-            resolver.query(uri, arrayOf(
-                MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.TITLE,
-                MediaStore.Audio.Media.ARTIST, MediaStore.Audio.Media.ALBUM), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    title = cursor.getString(1).orEmpty().ifBlank { cursor.getString(0).orEmpty().substringBeforeLast('.') }
-                    artist = cursor.getString(2).orEmpty()
-                    album = cursor.getString(3).orEmpty()
+            // MediaStore 元数据列只有媒体 URI 认识；SAF 文档 URI 读不到时退回文件名，导入不因元数据缺失而失败。
+            runCatching {
+                resolver.query(uri, arrayOf(
+                    MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
+                    MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        fun text(column: String): String {
+                            val index = cursor.getColumnIndex(column)
+                            return if (index >= 0) cursor.getString(index).orEmpty() else ""
+                        }
+                        title = text(MediaStore.Audio.Media.TITLE).ifBlank { text(MediaStore.Audio.Media.DISPLAY_NAME).substringBeforeLast('.') }
+                        artist = text(MediaStore.Audio.Media.ARTIST)
+                        album = text(MediaStore.Audio.Media.ALBUM)
+                    }
                 }
             }
             if (title.isBlank()) {

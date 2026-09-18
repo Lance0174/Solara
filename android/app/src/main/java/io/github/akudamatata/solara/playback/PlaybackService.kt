@@ -10,6 +10,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.ResolvingDataSource
@@ -48,6 +49,7 @@ class PlaybackService : MediaSessionService() {
     private lateinit var player: ExoPlayer
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var artworkJob: Job? = null
+    private var retriedKey: String? = null
     private val app get() = application as SolaraApplication
 
     override fun onCreate() {
@@ -84,6 +86,7 @@ class PlaybackService : MediaSessionService() {
         player.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) {
                 pauseIfSleepTimerExpired()
+                if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) retriedKey = null
                 if (events.contains(Player.EVENT_TIMELINE_CHANGED)) {
                     app.store.saveQueue((0 until player.mediaItemCount).mapNotNull { player.getMediaItemAt(it).song() })
                     if (player.mediaItemCount == 0) player.stop()
@@ -94,6 +97,17 @@ class PlaybackService : MediaSessionService() {
                 if (events.contains(Player.EVENT_REPEAT_MODE_CHANGED) || events.contains(Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED)) {
                     app.store.playMode = if (player.shuffleModeEnabled) 2 else if (player.repeatMode == Player.REPEAT_MODE_ONE) 1 else 0
                 }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                val song = player.currentMediaItem?.song() ?: return
+                // 与网页一致的自动重试：签名直链可能已过期，作废缓存重新解析后再试一次；
+                // 本地文件与已重试过的曲目不再重试。
+                if (song.localUri.isNotBlank() || retriedKey == song.key) return
+                retriedKey = song.key
+                app.api.forgetResolvedAudio(song)
+                player.prepare()
+                player.play()
             }
         })
         scope.launch {

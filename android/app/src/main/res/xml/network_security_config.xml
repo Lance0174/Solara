@@ -1,9 +1,7 @@
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <!-- 音源返回的音频直链存在仅支持 HTTP 的 CDN：酷我上游明确要求 HTTP，其余音源 HTTPS 探测失败时
+         也需要回退原始 HTTP 地址重试。Solara 站点与音乐 API 在设置校验中强制 HTTPS，不受此处影响。 -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors><certificates src="system" /></trust-anchors>
     </base-config>
-    <!-- 原代理明确要求酷我音频使用 HTTP；例外只覆盖该音源。 -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">kuwo.cn</domain>
-    </domain-config>
 </network-security-config>

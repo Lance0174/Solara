@@ -13,6 +13,10 @@ import io.github.akudamatata.solara.playback.SleepTimer
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
+// 音源接口与音频 CDN 只对浏览器 UA 放行（网页端即浏览器 UA），统一携带 Chrome 移动版标识。
+private const val BROWSER_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
 class SolaraApplication : Application() {
     val store by lazy { LibraryStore(this) }
     val cookies by lazy { SessionCookies(this) }
@@ -21,7 +25,8 @@ class SolaraApplication : Application() {
             .readTimeout(30, TimeUnit.SECONDS).addInterceptor { chain ->
                 val request = chain.request()
                 val host = request.url.host
-                val builder = request.newBuilder().header("User-Agent", "Solara-Android/1.0")
+                // 音源接口与音频 CDN 会拒绝陌生客户端 UA，网页端始终以浏览器 UA 访问，这里保持一致。
+                val builder = request.newBuilder().header("User-Agent", BROWSER_USER_AGENT)
                 if (host == "kuwo.cn" || host.endsWith(".kuwo.cn")) builder.header("Referer", "https://www.kuwo.cn/")
                 chain.proceed(builder.build())
             }.build()

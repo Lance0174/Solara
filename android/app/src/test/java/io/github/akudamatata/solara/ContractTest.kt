@@ -103,15 +103,29 @@ class ContractTest {
         }
     }
 
-    @Test fun signedAudioUrlsAreResolvedFreshForEveryRequest() {
+    @Test fun signedAudioUrlsAreCachedPerQualityWithinFifteenMinutes() {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setBody("""{"url":"https://example.com/audio.mp3?sign=one","br":128}"""))
             server.enqueue(MockResponse().setBody("""{"url":"https://example.com/audio.mp3?sign=two","br":320}"""))
             val api = MusicApi(OkHttpClient()) { Settings(api = server.url("/api.php").toString()) }
-            assertEquals(128, api.resolve(song, "128").bitrate)
-            assertEquals("two", api.resolve(song, "320").url.queryParameter("sign"))
+            assertEquals(128, api.resolve(song, "128") { true }.bitrate)
+            assertEquals("two", api.resolve(song, "320") { true }.url.queryParameter("sign"))
+            // 缓存窗口内重复解析不再请求接口（与网页直链缓存一致），不同音质各自解析。
+            assertEquals(128, api.resolve(song, "128") { true }.bitrate)
             assertEquals("128", server.takeRequest().requestUrl!!.queryParameter("br"))
             assertEquals("320", server.takeRequest().requestUrl!!.queryParameter("br"))
+            assertEquals(2, server.requestCount)
+        }
+    }
+
+    @Test fun forgettingResolvedAudioForcesFreshResolution() {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"url":"https://example.com/a.mp3?sign=stale","br":320}"""))
+            server.enqueue(MockResponse().setBody("""{"url":"https://example.com/a.mp3?sign=fresh","br":320}"""))
+            val api = MusicApi(OkHttpClient()) { Settings(api = server.url("/api.php").toString()) }
+            assertEquals("stale", api.resolve(song, "320") { true }.url.queryParameter("sign"))
+            api.forgetResolvedAudio(song)
+            assertEquals("fresh", api.resolve(song, "320") { true }.url.queryParameter("sign"))
         }
     }
 
@@ -156,8 +170,37 @@ class ContractTest {
             server.enqueue(MockResponse().setBody("""{"url":"http://m.music.126.net/a.mp3","br":320}"""))
             server.enqueue(MockResponse().setBody("""{"url":"http://cdn.kuwo.cn/a.mp3","br":320}"""))
             val api = MusicApi(OkHttpClient()) { Settings(api = server.url("/api.php").toString()) }
-            assertTrue(api.resolve(song, "320").url.isHttps)
-            assertFalse(api.resolve(song.copy(source = "kuwo"), "320").url.isHttps)
+            // HTTPS 探测可用时优先 HTTPS（与网页一致），酷我保留上游要求的 HTTP。
+            assertTrue(api.resolve(song, "320") { true }.url.isHttps)
+            assertFalse(api.resolve(song.copy(source = "kuwo"), "320") { true }.url.isHttps)
+        }
+    }
+
+    @Test fun audioResolutionFallsBackToOriginalUrlWhenHttpsIsUnreachable() {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"url":"http://127.0.0.1:${server.port}/a.mp3","br":320}"""))
+            val api = MusicApi(OkHttpClient()) { Settings(api = server.url("/api.php").toString()) }
+            // HTTPS 化地址探测失败（真实场景：对纯 HTTP 服务器的 TLS 握手必然失败）时回退上游原始地址。
+            // 探测用注入桩模拟，避免真实网络计数受 OkHttp 对瞬时连接失败自动重试的影响。
+            val audio = api.resolve(song, "320") { !it.isHttps }
+            assertFalse(audio.url.isHttps)
+            assertEquals("/a.mp3", audio.url.encodedPath)
+            assertEquals(1, server.requestCount)
+        }
+    }
+
+    @Test fun resolvedAudioUrlIsReusedWithoutProbingAgain() {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"url":"http://127.0.0.1:${server.port}/a.mp3","br":320}"""))
+            val api = MusicApi(OkHttpClient()) { Settings(api = server.url("/api.php").toString()) }
+            // 探测桩：https 候选不可达、http 候选可达；调用次数用于验证命中缓存后不再探测。
+            var probes = 0
+            val first = api.resolve(song, "320") { probes++ > 0 }
+            val second = api.resolve(song, "320") { probes++ > 0 }
+            assertEquals(first.url, second.url)
+            // 第二次解析命中缓存：不请求接口，也不重新探测，总请求仅首次解析的 1 次接口调用。
+            assertEquals(1, server.requestCount)
+            assertEquals(2, probes)
         }
     }
 }

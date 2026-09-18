@@ -22,6 +22,9 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+// 签名直链通常在 1–2 小时后过期，15 分钟的缓存窗口与网页保持一致，足够覆盖一次连续播放。
+private const val AUDIO_URL_TTL_MS = 15 * 60 * 1000L
+
 class MusicApi(val client: OkHttpClient, private val settings: () -> Settings) {
     private val neteasePublic by lazy {
         client.newBuilder().cookieJar(CookieJar.NO_COOKIES).followRedirects(false).followSslRedirects(false)
@@ -142,16 +145,52 @@ class MusicApi(val client: OkHttpClient, private val settings: () -> Settings) {
 
     data class Audio(val url: HttpUrl, val bitrate: Int)
 
-    fun resolve(song: Song, quality: String): Audio {
+    private data class ResolvedAudio(val url: String, val bitrate: Int, val resolvedAt: Long)
+
+    // 与网页一致的直链短期缓存：拖动/切缓存分段触发的重复解析不再请求接口，15 分钟后过期重新解析。
+    private val resolvedAudios = HashMap<String, ResolvedAudio>()
+    private val probeClient by lazy {
+        client.newBuilder().cookieJar(CookieJar.NO_COOKIES).callTimeout(8, TimeUnit.SECONDS).build()
+    }
+
+    // 播放前的轻量探测：只取 2 字节确认直链可用，等价网页在播放前先加载音频元数据再选定地址。
+    private fun reachable(url: HttpUrl): Boolean = try {
+        probeClient.newCall(Request.Builder().url(url).header("Range", "bytes=0-1").build()).execute().use { response ->
+            response.isSuccessful
+        }
+    } catch (_: Exception) { false }
+
+    fun resolve(song: Song, quality: String, probe: (HttpUrl) -> Boolean = { url -> reachable(url) }): Audio {
+        val cacheKey = "${endpoint()}|${song.source}:${song.id}:$quality"
+        synchronized(resolvedAudios) {
+            resolvedAudios[cacheKey]?.let { cached ->
+                if (System.currentTimeMillis() - cached.resolvedAt < AUDIO_URL_TTL_MS) return Audio(cached.url.toHttpUrl(), cached.bitrate)
+                resolvedAudios.remove(cacheKey)
+            }
+        }
         val result = get("url", mapOf("id" to song.id, "source" to song.source, "br" to quality)) as? JSONObject
             ?: throw IOException("无法解析音频地址")
         val url = result.optString("url").toHttpUrlOrNull()
             ?: throw IOException("这首歌暂时没有可用音频，请切换音质或音源")
-        // 酷我保留上游要求的 HTTP；其他音源沿用网页的 HTTPS 优先策略。
-        val streamUrl = if (!url.isHttps && url.host != "kuwo.cn" && !url.host.endsWith(".kuwo.cn")) {
-            url.newBuilder().scheme("https").build()
-        } else url
-        return Audio(streamUrl, result.optInt("br", 0))
+        // 网页会依次尝试 HTTPS 化与原始地址；这里同样优先 HTTPS，探测失败再回退上游原始地址。
+        // 酷我保留上游要求的 HTTP，不升级。
+        val candidates = when {
+            url.isHttps -> listOf(url)
+            url.host == "kuwo.cn" || url.host.endsWith(".kuwo.cn") -> listOf(url)
+            else -> listOf(url.newBuilder().scheme("https").build(), url)
+        }
+        val streamUrl = candidates.firstOrNull(probe) ?: candidates.last()
+        val audio = Audio(streamUrl, result.optInt("br", 0))
+        synchronized(resolvedAudios) { resolvedAudios[cacheKey] = ResolvedAudio(streamUrl.toString(), audio.bitrate, System.currentTimeMillis()) }
+        return audio
+    }
+
+    // 播放失败自动重试时调用：作废直链缓存，强制重新解析（等价网页重试的 nocache=true）。
+    fun forgetResolvedAudio(song: Song) {
+        synchronized(resolvedAudios) {
+            val prefix = "${song.source}:${song.id}:"
+            resolvedAudios.keys.filter { it.substringAfterLast('|').startsWith(prefix) }.forEach { resolvedAudios.remove(it) }
+        }
     }
 
     fun cover(song: Song): String {
