@@ -38,7 +38,11 @@ echo "  🌟 Solara  (Cloudflare Pages + Wrangler local dev)"
 echo "  ────────────────────────────────────────────────────"
 echo "  Port      : 8787"
 echo "  Data dir  : /data"
-echo "  Password  : ${PASSWORD:+configured}${PASSWORD:-not set (open access)}"
+if [ -n "$PASSWORD" ]; then
+  echo "  Password  : configured"
+else
+  echo "  Password  : not set (open access)"
+fi
 echo "  API URL   : ${API_BASE_URL:-https://music-api.gdstudio.xyz/api.php (default)}"
 echo "  Language  : ${_LANG_VALUE:-ZH (default)}"
 echo "  ────────────────────────────────────────────────────"
