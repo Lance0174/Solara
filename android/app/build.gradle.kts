@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.akudamatata.solara"
         minSdk = 29
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.8.1"
+        versionCode = 12
+        versionName = "1.8.2"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
