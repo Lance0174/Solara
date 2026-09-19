@@ -1,6 +1,8 @@
 package io.github.akudamatata.solara.ui
 
 import android.text.format.Formatter
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -19,6 +21,8 @@ import io.github.akudamatata.solara.BuildConfig
 import io.github.akudamatata.solara.MusicViewModel
 import io.github.akudamatata.solara.data.GENRES
 import io.github.akudamatata.solara.data.MAX_AUDIO_CACHE_GB
+import io.github.akudamatata.solara.data.THEME_STYLES
+import io.github.akudamatata.solara.playback.PlaybackDiagnostics
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -31,15 +35,31 @@ fun SettingsScreen(vm: MusicViewModel) {
     var site by rememberSaveable { mutableStateOf(saved.site) }
     var api by rememberSaveable { mutableStateOf(saved.api) }
     var theme by rememberSaveable { mutableStateOf(saved.theme) }
+    var themeStyle by rememberSaveable { mutableStateOf(saved.themeStyle) }
     var genres by rememberSaveable { mutableStateOf(saved.genres) }
     // 口令不进入 SavedState 或本地偏好，提交后立即清空。
     var password by remember { mutableStateOf("") }
+    val exportDiagnostics = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        uri?.let(vm::exportPlaybackDiagnostics)
+    }
     LaunchedEffect(vm) { vm.refreshAudioCache() }
     Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("设置", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("外观", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         ChoiceMenu(mapOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色")[theme].orEmpty(),
             linkedMapOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色")) { theme = it }
+        ChoiceMenu("主题风格：${THEME_STYLES[themeStyle]}", THEME_STYLES) { themeStyle = it }
+        Text("终末地风格默认关闭；选择后点击下方保存设置。明暗模式可独立选择。",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        SolaraTheme(saved.copy(theme = theme, themeStyle = themeStyle)) {
+            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("SOLARA // ${if (themeStyle == "endfield") "ENDFIELD" else "MUSIC"}", style = MaterialTheme.typography.labelMedium)
+                    Text("主题预览 · 音乐随行", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        }
         HorizontalDivider()
         Text("探索雷达", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text("选择想听的音乐风格", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -73,7 +93,7 @@ fun SettingsScreen(vm: MusicViewModel) {
                 modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
         }
         Button(onClick = {
-            vm.saveSettings(saved.copy(site = site, api = api, theme = theme, genres = genres.ifEmpty { GENRES.toSet() }), password) {
+            vm.saveSettings(saved.copy(site = site, api = api, theme = theme, themeStyle = themeStyle, genres = genres.ifEmpty { GENRES.toSet() }), password) {
                 password = ""
                 genres = genres.ifEmpty { GENRES.toSet() }
             }
@@ -84,6 +104,12 @@ fun SettingsScreen(vm: MusicViewModel) {
             TextButton(onClick = { vm.logout() }, enabled = !busy) { Text("退出站点登录") }
         }
         HorizontalDivider(Modifier.padding(top = 12.dp))
+        Text("播放诊断", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("声音异常后可导出本次运行最近 ${PlaybackDiagnostics.MAX_EVENTS} 条播放事件。记录仅在本机内存中保留，关闭进程后清空，不含音频、歌曲地址或口令。",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = { exportDiagnostics.launch("Solara-播放诊断-${System.currentTimeMillis()}.txt") },
+            enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("导出播放诊断") }
+        HorizontalDivider()
         Text("关于 Solara", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text("Android ${BuildConfig.VERSION_NAME} · 原生音乐客户端")
         Text("源项目：akudamatata/Solara\nhttps://github.com/akudamatata/Solara\n感谢 GD 音乐台提供音乐 API。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

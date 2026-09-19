@@ -112,4 +112,33 @@ class LibraryStoreTest {
         store.saveSettings(store.settings.value.copy(cacheLimitGb = 0))
         assertEquals(1, LibraryStore(context).settings.value.cacheLimitGb)
     }
+
+    @Test fun themeStyleDefaultsOffForNewAndUpgradedInstallations() {
+        assertEquals("default", LibraryStore(context).settings.value.themeStyle)
+        context.getSharedPreferences("solara-library", Context.MODE_PRIVATE).edit()
+            .putString("theme", "dark").putString("playlistSongs", SongLists.array(listOf(song)).toString()).commit()
+        val upgraded = LibraryStore(context)
+        assertEquals("default", upgraded.settings.value.themeStyle)
+        assertEquals("dark", upgraded.settings.value.theme)
+        assertEquals(listOf(song), upgraded.library.value.queue)
+    }
+
+    @Test fun themeStyleSurvivesReloadAndCanBeDisabledWithoutChangingBrightness() {
+        val store = LibraryStore(context)
+        store.saveSettings(store.settings.value.copy(theme = "dark", themeStyle = "endfield"))
+        val restored = LibraryStore(context)
+        assertEquals("endfield", restored.settings.value.themeStyle)
+        assertEquals("dark", restored.settings.value.theme)
+        restored.saveSettings(restored.settings.value.copy(themeStyle = "default"))
+        assertEquals("default", LibraryStore(context).settings.value.themeStyle)
+        assertEquals("dark", LibraryStore(context).settings.value.theme)
+    }
+
+    @Test fun unsupportedThemeStylesFallBackToDefault() {
+        context.getSharedPreferences("solara-library", Context.MODE_PRIVATE).edit().putString("themeStyle", "future-style").commit()
+        val store = LibraryStore(context)
+        assertEquals("default", store.settings.value.themeStyle)
+        store.saveSettings(store.settings.value.copy(themeStyle = "invalid"))
+        assertEquals("default", LibraryStore(context).settings.value.themeStyle)
+    }
 }

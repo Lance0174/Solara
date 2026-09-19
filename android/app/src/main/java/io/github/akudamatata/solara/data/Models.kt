@@ -6,6 +6,7 @@ import org.json.JSONTokener
 
 val SOURCES = linkedMapOf("netease" to "网易云音乐", "kuwo" to "酷我音乐", "joox" to "JOOX音乐", "bilibili" to "哔哩哔哩", "local" to "本地音频")
 val QUALITIES = linkedMapOf("128" to "标准 · 128K", "192" to "高品 · 192K", "320" to "极高 · 320K", "999" to "无损 · FLAC")
+val THEME_STYLES = linkedMapOf("default" to "Solara · 默认", "endfield" to "终末地风格")
 val GENRES = listOf("流行", "摇滚", "古典音乐", "民谣", "电子", "爵士", "说唱", "乡村", "蓝调", "R&B", "金属", "嘻哈", "轻音乐")
 const val DEFAULT_API = "https://music-api.gdstudio.xyz/api.php"
 const val MAX_AUDIO_CACHE_GB = 5
@@ -135,6 +136,8 @@ data class Settings(
     val genres: Set<String> = GENRES.toSet(),
     // 播放缓存独立于用户下载文件，默认及最高容量均为 5 GB。
     val cacheLimitGb: Int = MAX_AUDIO_CACHE_GB,
+    // 视觉风格独立于明暗模式；旧版本升级与首次安装均保留默认外观。
+    val themeStyle: String = "default",
 )
 
 data class Library(val queue: List<Song> = emptyList(), val favorites: List<Song> = emptyList())

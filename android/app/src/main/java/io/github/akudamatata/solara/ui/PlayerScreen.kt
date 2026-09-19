@@ -11,6 +11,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -20,7 +21,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -92,9 +92,23 @@ fun PlayerScreen(vm: MusicViewModel, onQueue: () -> Unit, onDownload: (Song) -> 
                     Modifier.padding(top = 4.dp, bottom = 8.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     if (showLyrics && player.song != null) {
-                        Column(Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))) {
+                        Column(Modifier.fillMaxSize().clip(solaraShape(28.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))) {
                             TextButton(onClick = { showLyrics = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, Modifier.size(18.dp)); Text("返回封面") }
                             LyricsPanel(vm, Modifier.weight(1f))
+                        }
+                    } else if (LocalEndfieldTheme.current) {
+                        Surface(Modifier.fillMaxSize(0.86f).aspectRatio(1f).sizeIn(maxWidth = 340.dp, maxHeight = 340.dp)
+                            .clickable(enabled = player.song != null, onClickLabel = "查看歌词") { showLyrics = true },
+                            shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("SOLARA // AUDIO", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                SongArtwork(player.song, vm, Modifier.weight(1f).fillMaxWidth().clip(MaterialTheme.shapes.small),
+                                    player.artwork, resolve = true)
+                                HorizontalDivider(color = MaterialTheme.colorScheme.primary, thickness = 2.dp)
+                                Text(if (player.playing) "播放中 / PLAY" else "待播放 / STANDBY", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     } else {
                         Box(Modifier.fillMaxSize(0.72f).aspectRatio(1f).sizeIn(maxWidth = 340.dp, maxHeight = 340.dp)
@@ -185,7 +199,7 @@ fun PlayerScreen(vm: MusicViewModel, onQueue: () -> Unit, onDownload: (Song) -> 
             }
             if (player.error.isNotBlank()) Surface(
                 modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(12.dp),
-                color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(16.dp)) {
+                color = MaterialTheme.colorScheme.errorContainer, shape = solaraShape(16.dp)) {
                 Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(player.error, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { vm.togglePlayback() }) { Text("重试") }
@@ -232,7 +246,7 @@ private fun LyricsPanel(vm: MusicViewModel, modifier: Modifier) {
         lyrics.lines.isEmpty() -> EmptyState(Icons.Rounded.MusicNote, "暂无歌词", "让旋律继续", modifier)
         else -> LazyColumn(modifier.fillMaxWidth(), state = state, contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             itemsIndexed(lyrics.lines) { index, line ->
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { vm.seek(line.timeMs) }.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(Modifier.fillMaxWidth().clip(solaraShape(12.dp)).clickable { vm.seek(line.timeMs) }.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(line.text.ifBlank { "♪" }, color = if (index == current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         style = if (index == current) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
                         fontWeight = if (index == current) FontWeight.Bold else FontWeight.Normal, textAlign = TextAlign.Center)
@@ -245,11 +259,11 @@ private fun LyricsPanel(vm: MusicViewModel, modifier: Modifier) {
 
 @Composable
 fun MiniPlayer(player: PlaybackState, vm: MusicViewModel, onOpen: () -> Unit) {
-    Surface(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(18.dp)).clickable(onClick = onOpen),
+    Surface(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(solaraShape(18.dp)).clickable(onClick = onOpen),
         color = MaterialTheme.colorScheme.primaryContainer, tonalElevation = 3.dp) {
         Column {
             Row(Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                SongArtwork(player.song, vm, Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)), player.artwork)
+                SongArtwork(player.song, vm, Modifier.size(44.dp).clip(solaraShape(12.dp)), player.artwork)
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text(player.song?.name.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
                     Text(player.song?.artist.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)

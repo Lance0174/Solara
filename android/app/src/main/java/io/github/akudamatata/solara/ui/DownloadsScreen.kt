@@ -3,7 +3,6 @@ package io.github.akudamatata.solara.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -37,7 +36,7 @@ fun DownloadsScreen(vm: MusicViewModel, onAddToPlaylist: (Song) -> Unit) {
                 val song = downloadSong(info)
                 val quality = downloadQuality(info)
                 val percent = info.progress.getInt("percent", -1)
-                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))) {
+                Card(shape = solaraShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))) {
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(if (info.state == WorkInfo.State.SUCCEEDED) Icons.Rounded.CheckCircle else Icons.Rounded.Download,

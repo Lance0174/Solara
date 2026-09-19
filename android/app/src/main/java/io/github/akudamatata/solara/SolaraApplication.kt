@@ -10,6 +10,7 @@ import io.github.akudamatata.solara.data.SessionCookies
 import io.github.akudamatata.solara.playback.AudioCache
 import io.github.akudamatata.solara.playback.CacheCleanupWorker
 import io.github.akudamatata.solara.playback.SleepTimer
+import io.github.akudamatata.solara.playback.PlaybackDiagnostics
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -34,6 +35,7 @@ class SolaraApplication : Application() {
     val api by lazy { MusicApi(client) { store.settings.value } }
     val audioCache by lazy { AudioCache(this, { store.settings.value.cacheLimitGb * AudioCache.GB }) }
     val sleepTimer = SleepTimer()
+    val playbackDiagnostics = PlaybackDiagnostics()
 
     override fun onCreate() {
         super.onCreate()

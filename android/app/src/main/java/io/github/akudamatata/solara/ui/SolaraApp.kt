@@ -7,14 +7,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -50,21 +48,9 @@ fun SolaraApp(vm: MusicViewModel = viewModel()) {
     val player by vm.playback.collectAsStateWithLifecycle()
     val library by vm.library.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
-    val dark = settings.theme == "dark" || (settings.theme == "system" && isSystemInDarkTheme())
-    val colors = if (dark) darkColorScheme(
-        primary = Color(0xFF62DCC1), onPrimary = Color(0xFF053D33),
-        primaryContainer = Color(0xFF164C42), onPrimaryContainer = Color(0xFFB4F4DF),
-        background = Color(0xFF0B1D1B), surface = Color(0xFF122925),
-        surfaceContainer = Color(0xFF19342E), surfaceContainerHigh = Color(0xFF203B35),
-        onSurface = Color(0xFFE5F4EE), onSurfaceVariant = Color(0xFFA8C0B7),
-    ) else lightColorScheme(
-        primary = Color(0xFF12836D), onPrimary = Color.White,
-        primaryContainer = Color(0xFFC4EDDF), onPrimaryContainer = Color(0xFF174E42),
-        background = Color(0xFFF0F8F3), surface = Color(0xFFF8FCF9),
-        surfaceContainer = Color(0xFFE5F2EA), surfaceContainerHigh = Color(0xFFDDEDE3),
-        onSurface = Color(0xFF243F36), onSurfaceVariant = Color(0xFF617B70),
-    )
-    MaterialTheme(colorScheme = colors) {
+    SolaraTheme(settings) {
+        val colors = MaterialTheme.colorScheme
+        val endfield = LocalEndfieldTheme.current
         var tab by rememberSaveable { mutableIntStateOf(0) }
         var searchOrigin by rememberSaveable { mutableIntStateOf(0) }
         val pageState = rememberSaveableStateHolder()
@@ -86,7 +72,7 @@ fun SolaraApp(vm: MusicViewModel = viewModel()) {
                 CenterAlignedTopAppBar(
                     title = { Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Solara", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        Text("光域 · 音乐随行", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                        Text(if (endfield) "音乐终端 · 终末地风格" else "光域 · 音乐随行", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
                     } },
                     navigationIcon = {
                         when (tab) {
@@ -115,7 +101,8 @@ fun SolaraApp(vm: MusicViewModel = viewModel()) {
                 }
             },
         ) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).background(Brush.verticalGradient(listOf(colors.primaryContainer.copy(alpha = 0.4f), colors.background)))) {
+            Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).background(Brush.verticalGradient(
+                if (endfield) listOf(colors.background, colors.background) else listOf(colors.primaryContainer.copy(alpha = 0.4f), colors.background)))) {
                 pageState.SaveableStateProvider(tab) {
                     when (tab) {
                         0 -> PlayerScreen(vm, onQueue = { pageState.removeState(2); tab = 2 },
@@ -195,10 +182,10 @@ fun EmptyState(icon: ImageVector, title: String, detail: String, modifier: Modif
 
 @Composable
 fun SongRow(song: Song, favorite: Boolean, playing: Boolean, vm: MusicViewModel, onPlay: () -> Unit, onActions: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+    Row(Modifier.fillMaxWidth().clip(solaraShape(18.dp))
         .background(if (playing) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else Color.Transparent)
         .clickable(onClick = onPlay).padding(start = 10.dp, top = 9.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-        SongArtwork(song, vm, Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)))
+        SongArtwork(song, vm, Modifier.size(48.dp).clip(solaraShape(12.dp)))
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(song.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = if (playing) FontWeight.Bold else FontWeight.Medium)
             Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -220,7 +207,7 @@ private fun SearchScreen(vm: MusicViewModel, onSong: (Song) -> Unit, onActions: 
     Column(Modifier.fillMaxSize().imePadding().padding(horizontal = 16.dp)) {
         Text("找到下一首心动", Modifier.padding(vertical = 14.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         OutlinedTextField(value = query, onValueChange = { query = it }, Modifier.fillMaxWidth(),
-            singleLine = true, placeholder = { Text("歌曲、歌手或专辑") }, shape = RoundedCornerShape(24.dp),
+            singleLine = true, placeholder = { Text("歌曲、歌手或专辑") }, shape = solaraShape(24.dp),
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
             trailingIcon = { ActionIcon(Icons.AutoMirrored.Rounded.ArrowForward, "搜索", enabled = query.isNotBlank()) { vm.search(query); focus.clearFocus() } },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { vm.search(query); focus.clearFocus() }))
@@ -261,7 +248,7 @@ fun ChoiceMenu(label: String, options: Map<String, String>, onChoose: (String) -
 
 @Composable
 fun ErrorCard(message: String, retry: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = solaraShape(16.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(message, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = retry) { Text("重试") }
@@ -337,7 +324,7 @@ private fun LibraryScreen(
         }
         if (!overview) OutlinedTextField(value = query, onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
-            placeholder = { Text("搜索歌单内的歌曲、歌手或专辑") }, shape = RoundedCornerShape(24.dp),
+            placeholder = { Text("搜索歌单内的歌曲、歌手或专辑") }, shape = solaraShape(24.dp),
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
             trailingIcon = { if (query.isNotEmpty()) ActionIcon(Icons.Rounded.Close, "清空歌单搜索") { query = "" } },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -361,7 +348,7 @@ private fun LibraryScreen(
                     ListItem(headlineContent = { Text(local.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         supportingContent = { Text("${local.songs.size} 首歌曲") }, leadingContent = { Icon(Icons.Rounded.LibraryMusic, null) },
                         trailingContent = { ActionIcon(Icons.Rounded.PlayArrow, "播放${local.name}", enabled = local.songs.isNotEmpty() && player.ready) { onPlayList(local.songs, null) } },
-                        modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable { playlistId = local.id },
+                        modifier = Modifier.clip(solaraShape(16.dp)).clickable { playlistId = local.id },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent))
                 }
             } else if (songs.isEmpty()) item {

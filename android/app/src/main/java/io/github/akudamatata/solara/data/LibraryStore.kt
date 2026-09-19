@@ -19,16 +19,19 @@ class LibraryStore(context: Context) {
         source = prefs.getString("searchSource", "netease") ?: "netease",
         quality = prefs.getString("playbackQuality", "320") ?: "320",
         theme = prefs.getString("theme", "system") ?: "system",
+        themeStyle = prefs.getString("themeStyle", "default")?.takeIf { it in THEME_STYLES } ?: "default",
         genres = prefs.getStringSet("genres", GENRES.toSet())?.toSet() ?: GENRES.toSet(),
         cacheLimitGb = prefs.getInt("audioCacheLimitGb", MAX_AUDIO_CACHE_GB).coerceIn(1, MAX_AUDIO_CACHE_GB),
     ))
     val settings = mutableSettings.asStateFlow()
 
     fun saveSettings(value: Settings) {
-        val saved = value.copy(cacheLimitGb = value.cacheLimitGb.coerceIn(1, MAX_AUDIO_CACHE_GB))
+        val saved = value.copy(cacheLimitGb = value.cacheLimitGb.coerceIn(1, MAX_AUDIO_CACHE_GB),
+            themeStyle = value.themeStyle.takeIf { it in THEME_STYLES } ?: "default")
         prefs.edit().putString("site", value.site).putString("api", value.api)
             .putString("searchSource", value.source).putString("playbackQuality", value.quality)
             .putString("theme", value.theme).putStringSet("genres", value.genres)
+            .putString("themeStyle", saved.themeStyle)
             .putInt("audioCacheLimitGb", saved.cacheLimitGb).apply()
         mutableSettings.value = saved
     }

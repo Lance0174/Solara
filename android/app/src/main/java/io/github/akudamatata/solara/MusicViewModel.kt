@@ -144,10 +144,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadLyrics(song: Song? = playback.value.song) {
+        // 切到本地曲目也先取消上一首的请求，避免旧歌词在空状态之后返回并覆盖界面。
+        lyricJob?.cancel()
         if (song == null) return
         // 本地音频没有在线歌词，直接显示空状态。
         if (song.localUri.isNotBlank()) { mutableLyrics.value = LyricsState(); return }
-        lyricJob?.cancel()
         lyricJob = viewModelScope.launch {
             mutableLyrics.value = LyricsState(busy = true)
             try { mutableLyrics.value = LyricsState(lines = withContext(Dispatchers.IO) { app.api.lyrics(song) }) }
@@ -513,6 +514,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 ?: error("无法写入歌单文件")
         }
         notice("已导出 ${songs.size} 首歌曲")
+    }
+
+    fun exportPlaybackDiagnostics(uri: Uri) = operation {
+        val report = "Solara Android ${BuildConfig.VERSION_NAME} / Android API ${android.os.Build.VERSION.SDK_INT}\n" +
+            "记录范围：本次运行最近 ${io.github.akudamatata.solara.playback.PlaybackDiagnostics.MAX_EVENTS} 条事件；不包含音频和歌曲地址。\n" +
+            "准备播放原因：1=用户操作，2=音频焦点，3=耳机断开；播放状态：1=空闲，2=缓冲，3=就绪，4=结束。\n" +
+            "输出增益是应用送入音频输出的值；部分系统自动压低、蓝牙设备音量和音效不会反映在该数值中。\n\n" +
+            app.playbackDiagnostics.snapshot()
+        withContext(Dispatchers.IO) {
+            app.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(report) }
+                ?: error("无法写入播放诊断文件")
+        }
+        notice("播放诊断已导出")
     }
 
     private fun operation(block: suspend () -> Unit) {
