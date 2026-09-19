@@ -385,6 +385,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         action(song.copy(localUri = uri))
     }
 
+    // 外观与探索雷达风格是离散选择，改动立即持久化生效，无需手动保存；站点连接涉及网络校验仍走 saveSettings。
+    fun saveAppearance(theme: String = settings.value.theme, themeStyle: String = settings.value.themeStyle, genres: Set<String> = settings.value.genres) {
+        app.store.saveSettings(settings.value.copy(theme = theme, themeStyle = themeStyle, genres = genres.ifEmpty { GENRES.toSet() }))
+    }
+
     fun saveSettings(value: Settings, password: String, onSaved: () -> Unit) = operation {
         val api = value.api.trim().toHttpUrlOrNull()
         require(api != null && api.isHttps && api.username.isBlank() && api.password.isBlank()) { "音乐 API 请填写不含账号口令的 HTTPS 地址" }

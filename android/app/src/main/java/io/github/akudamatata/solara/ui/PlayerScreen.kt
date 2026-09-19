@@ -4,14 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Build
 import android.widget.Toast
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -20,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -32,10 +23,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -86,40 +73,21 @@ fun PlayerScreen(vm: MusicViewModel, onQueue: () -> Unit, onDownload: (Song) -> 
     val sleepTimerRemaining = player.sleepTimerRemainingMs.takeIf { it > 0 }?.let { timeLabel(it + 999) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth > 700.dp
+        // 封面即页面：封面与歌词是同一页面的两个状态，点按封面切换到歌词，不做浮层叠放；歌词直接铺在页面上。
         val cover: @Composable () -> Unit = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxSize()) {
-                Text(if (player.song == null) "此刻，听见好音乐" else if (player.song!!.localUri.isNotBlank()) "离线播放" else "正在播放",
-                    Modifier.padding(top = 4.dp, bottom = 8.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    if (showLyrics && player.song != null) {
-                        Column(Modifier.fillMaxSize().clip(solaraShape(28.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))) {
-                            TextButton(onClick = { showLyrics = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, Modifier.size(18.dp)); Text("返回封面") }
-                            LyricsPanel(vm, Modifier.weight(1f))
-                        }
-                    } else if (LocalEndfieldTheme.current) {
-                        Surface(Modifier.fillMaxSize(0.86f).aspectRatio(1f).sizeIn(maxWidth = 340.dp, maxHeight = 340.dp)
-                            .clickable(enabled = player.song != null, onClickLabel = "查看歌词") { showLyrics = true },
-                            shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("SOLARA // AUDIO", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                                SongArtwork(player.song, vm, Modifier.weight(1f).fillMaxWidth().clip(MaterialTheme.shapes.small),
-                                    player.artwork, resolve = true)
-                                HorizontalDivider(color = MaterialTheme.colorScheme.primary, thickness = 2.dp)
-                                Text(if (player.playing) "播放中 / PLAY" else "待播放 / STANDBY", style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    } else {
-                        Box(Modifier.fillMaxSize(0.72f).aspectRatio(1f).sizeIn(maxWidth = 340.dp, maxHeight = 340.dp)
-                            .clickable(enabled = player.song != null, onClickLabel = "查看歌词") { showLyrics = true }, contentAlignment = Alignment.Center) {
-                            Vinyl(player.playing)
-                            SongArtwork(player.song, vm, Modifier.fillMaxSize(0.64f).clip(CircleShape), player.artwork, resolve = true)
-                        }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (showLyrics && player.song != null) {
+                    Column(Modifier.fillMaxSize()) {
+                        TextButton(onClick = { showLyrics = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, Modifier.size(18.dp)); Text("返回封面") }
+                        LyricsPanel(vm, Modifier.weight(1f))
                     }
+                } else {
+                    SongArtwork(player.song, vm,
+                        Modifier.fillMaxSize(0.86f).aspectRatio(1f).sizeIn(maxWidth = 340.dp, maxHeight = 340.dp)
+                            .clip(solaraShape(28.dp))
+                            .clickable(enabled = player.song != null, onClickLabel = "查看歌词") { showLyrics = true },
+                        player.artwork, resolve = true)
                 }
-                Text(if (player.song == null) "你的音乐，安放于此" else "轻触封面 · 查看歌词", Modifier.padding(top = 8.dp),
-                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         val controls: @Composable () -> Unit = {
@@ -210,19 +178,6 @@ fun PlayerScreen(vm: MusicViewModel, onQueue: () -> Unit, onDownload: (Song) -> 
     if (showSleepTimer) SleepTimerDialog(remainingLabel = sleepTimerRemaining, enabled = player.ready,
         onSet = { vm.setSleepTimer(it); showSleepTimer = false },
         onCancel = { vm.cancelSleepTimer(); showSleepTimer = false }, onDismiss = { showSleepTimer = false })
-}
-
-@Composable
-private fun Vinyl(playing: Boolean) {
-    val rotation = if (playing) {
-        val transition = rememberInfiniteTransition(label = "唱片")
-        transition.animateFloat(0f, 360f, infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Restart), label = "旋转").value
-    } else 0f
-    Canvas(Modifier.fillMaxSize().graphicsLayer { rotationZ = rotation }) {
-        drawCircle(Brush.linearGradient(listOf(Color(0xFF193C33), Color(0xFF396253), Color(0xFF122D27))))
-        for (ring in 1..8) drawCircle(Color.White.copy(alpha = 0.065f), radius = size.minDimension * (0.33f + ring * 0.018f), style = Stroke(1.dp.toPx()))
-        drawArc(Color.White.copy(alpha = 0.12f), 205f, 42f, false, style = Stroke(12.dp.toPx()))
-    }
 }
 
 @Composable
