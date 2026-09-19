@@ -3,15 +3,12 @@ name: Android Build
 on:
   push:
     branches: [main]
-    tags:
-      - 'v*'
     paths:
       - 'android/**'
       - '.github/workflows/android-build.yml'
   pull_request:
     paths:
       - 'android/**'
-  workflow_dispatch:
 
 jobs:
   build:
@@ -42,41 +39,3 @@ jobs:
           name: solara-android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-
-  release:
-    name: Attach APK to Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Build release APK
-        working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew :app:assembleRelease --no-daemon
-
-      - name: Rename release APK with project name and version
-        working-directory: android
-        run: |
-          VERSION=$(grep -oP "versionName\s*=\s*\"\K[^\"]+" app/build.gradle.kts)
-          mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/Solara-${VERSION}.apk"
-          echo "artifact=Solara-${VERSION}.apk" >> "$GITHUB_ENV"
-
-      - name: Upload release APK to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: android/dist/${{ env.artifact }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

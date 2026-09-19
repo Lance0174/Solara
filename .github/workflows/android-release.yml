@@ -1,0 +1,83 @@
+name: Android Release
+
+# 标准化安卓发版：仅由 android-vX.Y.Z 标签触发，流程见仓库 issue #1。
+on:
+  push:
+    tags:
+      - 'android-v*'
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Guard, Test, Build and Publish
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # guard：标签必须与 versionName 一致，且不允许重复发布同一 Release。
+      - name: Guard tag version and duplicate release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep -oP "versionName\s*=\s*\"\K[^\"]+" app/build.gradle.kts)
+          TAG="${GITHUB_REF_NAME#android-v}"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "标签 $GITHUB_REF_NAME 与 versionName $VERSION 不一致，请修正标签或版本号后重新发版"
+            exit 1
+          fi
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME 已存在，避免重复发布"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_ENV"
+
+      # 发布前先跑单元测试，测试不过不出包。
+      - name: Run unit tests
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testDebugUnitTest --no-daemon
+
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      # Release Note：汇总上一个 android-v* 标签以来的提交记录。
+      - name: Collect release notes and rename APK
+        run: |
+          mkdir -p dist
+          PREV=$(git tag --list 'android-v*' --sort=-v:refname | grep -vx "$GITHUB_REF_NAME" | head -1)
+          {
+            echo "## 更新内容"
+            echo ""
+            if [ -n "$PREV" ]; then
+              git log --format='- %s (%h)' "$PREV..$GITHUB_REF_NAME"
+            else
+              echo "> 首个标准化发版，包含此前全部功能。"
+              git log --format='- %s (%h)' -10
+            fi
+          } > dist/notes.md
+          cp app/build/outputs/apk/release/app-release.apk "dist/Solara-${{ env.version }}.apk"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Solara Android ${{ env.version }}"
+          body_path: android/dist/notes.md
+          files: android/dist/Solara-*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -118,6 +118,15 @@ $env:ANDROID_HOME = '你的 Android SDK 目录'
 
 在本次工作站可运行 `./build-local.ps1` 复用已隔离的 JDK、SDK、Gradle 和缓存，不写系统环境变量。脚本退出时恢复原进程环境。
 
+## 发版
+
+安卓端采用标准化发版流程（见仓库 issue #1，参考 AUTO-MAS#870 的 guard 与产物命名思想）：
+
+1. 将 `android/app/build.gradle.kts` 的 `versionCode` 与 `versionName` 更新到目标版本并提交；
+2. 推送标签 `android-v<versionName>`（例如 `android-v1.8.2`），标签必须与 `versionName` 一致，旧 `v*` 标签仅作归档；
+3. `android-release.yml` 自动执行：guard 校验（标签版本一致、无同名 Release，防重复发布）→ 单元测试 → 构建 release APK → 汇总上一个 `android-v*` 标签以来的提交生成 Release Note → 发布 Release 并附 `Solara-<version>.apk`；
+4. `main` 推送与 PR 由 `android-build.yml` 跑调试构建、单测与 lint，不发布。
+
 ## 结构与验证
 
 - `data`：沿用上游的音乐/歌单契约、接口、设置与加密会话。
