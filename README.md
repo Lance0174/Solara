@@ -2,6 +2,15 @@
 
 > 🚀 **Solara 2.0 重磅进化**：由轻量后端服务支撑的现代化网页音乐播放器。2.0 版本彻底告别单体脚本，迈向现代化工业级模块解耦架构，带来网易云三大官方顶尖榜单音乐雷达、全功能自由拖拽与胶囊折叠调试台、Apple Design 深度流体美学与 iPhone 性能优化，以及极致平滑稳定的全平台播放体验。
 
+## 📱 关于本仓库（安卓用户请从这里开始）
+
+本仓库是 [akudamatata/Solara](https://github.com/akudamatata/Solara) 的 fork，**主要服务于原仓库的安卓用户**：在原项目基础上维护原生安卓客户端，并以标准化流程发布 APK。
+
+- **下载安装**：前往 [Releases](https://github.com/Lance0174/Solara/releases) 获取最新 `Solara-<版本>.apk`（发版标签格式为 `android-v<版本>`，与安卓端版本号一一对应）。
+- **安卓端功能说明与构建方法**：见 [android/README.md](./android/README.md)。
+- **标准化发版流程**：见 [issue #1](https://github.com/Lance0174/Solara/issues/1)。
+- 下方网页端文档沿用原仓库，供自行部署网页版参考。
+
 ![Solara Preview](./Preview.gif)
 | | | |
 |:--:|:--:|:--:|
