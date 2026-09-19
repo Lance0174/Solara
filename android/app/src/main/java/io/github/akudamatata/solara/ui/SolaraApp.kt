@@ -70,10 +70,7 @@ fun SolaraApp(vm: MusicViewModel = viewModel()) {
             containerColor = colors.background,
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Solara", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        Text(if (endfield) "音乐终端 · 终末地风格" else "光域 · 音乐随行", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
-                    } },
+                    title = { Text("Solara", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge) },
                     navigationIcon = {
                         when (tab) {
                             0 -> ActionIcon(Icons.Rounded.Radar, "探索雷达", enabled = !busy && player.ready) { vm.radar() }
